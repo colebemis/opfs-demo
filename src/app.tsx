@@ -1,100 +1,113 @@
+import { useMachine } from "@xstate/react";
 import git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
-import { FsaNodeFs } from "memfs/lib/fsa-to-node";
-import { IFileSystemDirectoryHandle } from "memfs/lib/fsa/types";
-import React from "react";
+import { createMachine, fromPromise, assign } from "xstate";
+import { fs } from "./fs";
 
-const REPO_DIR = "/repo";
+// TODO: Run file system and git commands in a web worker to avoid blocking the UI thread
 
-// Reference: https://github.com/streamich/memfs/blob/c8bfa38aa15f1d3c9f326e9c25c8972326193a26/demo/git-opfs/main.ts
-const rootDir =
-  navigator.storage.getDirectory() as unknown as Promise<IFileSystemDirectoryHandle>;
+const ROOT_DIR = "/tmp";
 
-const fs = new FsaNodeFs(rootDir);
+type Context = {
+  error: Error | null;
+};
 
-init(fs);
+type Event = { type: "SELECT_REPO"; repo: string };
 
-async function init(fs: FsaNodeFs) {
-  try {
-    // This will throw if the directory doesn't exist
-    await fs.promises.readdir(REPO_DIR);
-    console.log("Already cloned");
-  } catch (error) {
-    console.log("Cloning...");
-    await git.clone({
-      fs,
-      http,
-      dir: REPO_DIR,
-      corsProxy: "https://cors.isomorphic-git.org",
-      url: "https://github.com/colebemis/hello-world",
-      ref: "main",
-      singleBranch: true,
-      depth: 10,
-      // https://isomorphic-git.org/docs/en/onAuth
-      // onAuth: () => ({ username: <token> }),
-    });
-  }
-}
+const gitMachine = createMachine({
+  /** @xstate-layout N4IgpgJg5mDOIC5RQJYBcB0YC2AHNAngMQDCAMgPIByAogNoAMAuoqLgPazorsB2rIAB6IAtAEYAzBjEMArABYAbAA4A7LIA0IAogBM82RlWqJ8ieoC+FrakwBjADZ8UvKEQh8wGFwDd2Aay9HT0YWJBAOLjQefnDhBF1FeQxZBlVlMV1NbUQATl0rG3QMYN4XNzAAJ0r2SoxcBwBDNAAzWuwSp14wUIFI7j4BeMTk1PTM7J0Ehl0Uq2sQXnYIOAFbPs4B2NB4kUUxaTklNUnRRUKQWyw8Qg2omKHEZRStKbFZVSMxE4ur0vK7ltHggGK89LlRr9iigIA4wIDooM4oh0hgJLllGZ1GCEGIMXMFlcAK68fxLADuvBo1VqCIeyIQ8l0OIyBKsQA */
+  id: "git",
+  types: {} as { context: Context; events: Event },
+  context: {
+    error: null,
+  },
+  initial: "empty",
+  states: {
+    empty: {
+      on: {
+        SELECT_REPO: "cloning",
+      },
+    },
+    cloning: {
+      invoke: {
+        id: "clone",
+        input: ({ event }) => {
+          return { repo: event.repo };
+        },
+        src: fromPromise(async ({ input }) => {
+          // Clean up previous clone
+          console.log(`$ rm -rf ${ROOT_DIR}`);
+          await fs.promises.rm(ROOT_DIR, { recursive: true, force: true });
 
-/** Recursively list contents of a directory */
-async function* walk(
-  dir: string,
-  pattern: RegExp = /.*/
-): AsyncGenerator<string> {
-  const files = await fs.promises.readdir(dir);
-
-  for (const file of files) {
-    // Ignore .git directory
-    if (file === ".git") continue;
-
-    const path = `${dir}/${file}`;
-    const stat = await fs.promises.stat(path);
-
-    if (stat.isDirectory()) {
-      yield* walk(path, pattern);
-    } else if (stat.isFile() && pattern.test(file)) {
-      yield path;
-    }
-  }
-}
-
-/** Convert a generator to an array */
-async function toArray<T>(gen: AsyncGenerator<T>) {
-  const arr: T[] = [];
-  for await (const item of gen) {
-    arr.push(item);
-  }
-  return arr;
-}
+          // Clone the repo
+          console.log(
+            `$ git clone https://github.com/${input.repo}.git ${ROOT_DIR}`
+          );
+          await git.clone({
+            fs,
+            http,
+            dir: ROOT_DIR,
+            corsProxy: "https://cors.isomorphic-git.org",
+            url: `https://github.com/${input.repo}`,
+            ref: "main",
+            singleBranch: true,
+            depth: 1,
+            onMessage: console.log,
+            // https://isomorphic-git.org/docs/en/onAuth
+            // onAuth: () => ({}),
+          });
+        }),
+        onDone: "idle",
+        onError: {
+          target: "unknownError",
+          actions: assign({
+            error: ({ event }) => event.data as Error,
+          }),
+        },
+      },
+    },
+    idle: {
+      on: {
+        SELECT_REPO: "cloning",
+      },
+    },
+    unknownError: {
+      on: {
+        SELECT_REPO: {
+          target: "cloning",
+          actions: assign({ error: null }),
+        },
+      },
+    },
+  },
+});
 
 export function App() {
-  const [files, setFiles] = React.useState<string[]>([]);
-
-  React.useEffect(() => {
-    let ignore = false;
-
-    (async () => {
-      try {
-        const files = await toArray(walk(REPO_DIR, /\.md$/));
-
-        if (!ignore) {
-          setFiles(files);
-        }
-      } catch (error) {
-        if (!ignore) {
-          console.error(error);
-        }
-      }
-    })();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
+  const [state, send] = useMachine(gitMachine);
 
   return (
     <div>
-      <pre>{JSON.stringify(files, null, 2)}</pre>
+      <pre>{JSON.stringify(state.value)}</pre>
+      {state.context.error ? (
+        <pre>Error: {state.context.error.message}</pre>
+      ) : null}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          const repo = formData.get("repo");
+          send({ type: "SELECT_REPO", repo: `${repo}` });
+        }}
+      >
+        <input
+          type="text"
+          name="repo"
+          defaultValue="colebemis/hello-world"
+          required
+          pattern=".+\/.+" // Must contain a slash
+        />
+        <button type="submit">Select</button>
+      </form>
     </div>
   );
 }
