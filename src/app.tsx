@@ -5,6 +5,8 @@ import LagRadar from "react-lag-radar";
 import { assign, createMachine, fromPromise } from "xstate";
 import { fs } from "./fs";
 
+// TODO: Fix memfs Safari error: (await this.__getFileById(d,"writeFile")).createWritable is not a function.
+// TODO: Check if memfs git-opfs demo works in Safari
 // TODO: Configure synchronous fs adatper
 // TODO: Run file system and git commands in a web worker to avoid blocking the UI thread
 
@@ -19,7 +21,7 @@ type Context = {
 type Event = { type: "SELECT_REPO"; repo: string };
 
 const gitMachine = createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5RQJYBcB0KB26UEMAbFALxygGIIB7bMLbAN2oGt6d0BtABgF1FQAB2qw8tASAAeiAEzcAbBgUyArAEYZAFgDM8lds0KANCACeiTfM0Y12mQA4ZVlfe4B2ewE43AXx8nUTA40AmIybEowACco6iiMQUJ8NAAzOIBbBi4+CWFREPEkKVkFJXlVDR09A2MzRFs1Gyd9XRV5Tzs-APQMMHTBNFMKAGUAUQAZUYBhABUAfQAlUYAFAHkefiK8sWwJaQQda1UPNw61T1VtNRNzBA1PDHK9TTU3eW5tbheZLpBAjAAxoRaOQqLR2ExWPQgeCNrkRDs9ohTtwbG1dKd5Lp7Jp7DdEHZGp5lNoXNxuN53PJfv8YbgIhRorF4olkmkopk6WA4VsEQVdkV9ii0Vj5Jjsbj8Xc3G4MJ59JVdNxbCoVDSeigIIQwCMJtN5ks1jyhHyUIVQELiSKMZ5RTi8XUEDI3I1DOUZA4FJpNJ57OrMABXbAsbDUADu2FGMTiusms0WK3WOV5+TNAotyKtanRYttEs8UvsjRU5NL8ns8nkah0fn8IFDEDgEkC8NT5uKCAAtPIpZ2VHLPIOh8Oh9p-VkQkRSORW4jBRYZFKNKj7G99FZ7C5PvY-XX-n0BrcTW30x3tAYbKvVVWZOdiYvHbZURpnq93p9vuO6TOU3OMwh3kaCltHsAwi2VNx9CXUonhUNw5HPTxszUNRx01bVZ35JEEHlRRBw9QwXDFbgVClAxFBA518J0HExz3HogxDcNI2jKJMLTbDcIHAiSIrNwSKXWwlBUQcSPPPQ1EcXc-CAA */
+  /** @xstate-layout N4IgpgJg5mDOIC5RQJYBcB0KB26UEMAbFALxygGIIB7bMLbAN2oGt6d0BtABgF1FQAB2qw8tASAAeiAEzcAbBgUyArNwCcARhUAOTQHYZAFn0AaEAE9ER+UYyaAzDP06HOmQcOaAvt-OpMDjQCYjJsSjAAJ0jqSIxBQnw0ADNYgFsGLj4JYVFg8SQpWQUleVUNbT1DE3MrBAcDDBknHW5dHX0bNt9-dAwwNME0CwoAZQBRABlxgGEAFQB9ACVxgAUAeR5+QtyxbAlpBCMHO1UXGRl1GXkdIx0dWsQGlQx9Fu4HBXlNa4MekACGAAxoRaOQqLR2ExWPQQZCtjkRHsDoh9OpuPYVPJPoY9B5HvUPBh0WUVOpdD9NOodP9AXDcOEKFEYnEEklUpEMvSwAidkj8vtCoc0RjtNjuLjKQTPMSVA03DddDcaX4AX0UBBCGAxlNZosVhteUJ+SgCqBhejMeLJfjLLJ9JoMEZlPJ1J9ripHPpaX0AK7YFjYagAd2w42isR103myzWm2yfLypsF5tRlrFOJkeM0BL0GDU3ELxmuRgM8m9-yDEDgEgCiKTZqKCAAtPICa2lIWu92u1mfYFcMEiKRyPXkULrDICUY7hgHGT55pjg5Xe5+-1BsMxwKUfUTvYOmpWiprjczHb6ppFM0sx8vj9vhXeph6aPE+PUwh5NxHRoHPoAN0LRNAeC9LhkV4Wm0BwYLUTRtHXDUtW3ZNd3JRR1CuX51GOEwtAJE5FDcW8rivZ03iMdd-UDEMwwjSIUMbQ50OJLDvhwk40RzC8qTsQj-24S5qkcGRfF8IA */
   id: "git",
   types: {} as { context: Context; events: Event },
   context: {
