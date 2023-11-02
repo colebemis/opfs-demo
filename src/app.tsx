@@ -17,6 +17,7 @@ init(fs);
 async function init(fs: FsaNodeFs) {
   try {
     // This will throw if the directory doesn't exist
+    await fs.promises.readdir(REPO_DIR);
     console.log("Already cloned");
   } catch (error) {
     console.log("Cloning...");
@@ -25,7 +26,7 @@ async function init(fs: FsaNodeFs) {
       http,
       dir: REPO_DIR,
       corsProxy: "https://cors.isomorphic-git.org",
-      url: "https://github.com/lumen-notes/notes-template",
+      url: "https://github.com/colebemis/hello-world",
       ref: "main",
       singleBranch: true,
       depth: 10,
