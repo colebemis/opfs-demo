@@ -1,4 +1,4 @@
-import git from "isomorphic-git";
+import git, { WORKDIR } from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import { atom, useAtom, useAtomValue } from "jotai";
 import { atomWithMachine } from "jotai-xstate";
@@ -16,21 +16,21 @@ const DEFAULT_BRANCH = "main";
 
 type Context = {
   repo: string;
-  files: string[];
+  markdownFiles: Record<string, string>;
   error: Error | null;
 };
 
-type Event = { type: "SELECT_REPO"; repo: string };
+type Event = { type: "SELECT_REPO"; repo: string } | { type: "SYNC" };
 
 function createGitMachine() {
   return createMachine({
-    /** @xstate-layout N4IgpgJg5mDOIC5RQJYBcB0KB26UEMAbFALxygGIIB7bMLbAN2oGt6d0BtABgF1FQAB2qw8tASAAeiAEzcAbBgUyArNwCcARhUAOTQHYZAFn0AaEAE9ER+UYyaAzDP06HOmQcOaAvt-OpMDjQCYjJsSjAAJ0jqSIxBQnw0ADNYgFsGLj4JYVFg8SQpWQUleVUNbT1DE3MrBAcDDBknHW5dHX0bNt9-dAwwNME0CwoAZQBRABlxgGEAFQB9ACVxgAUAeR5+QtyxbAlpBCMHO1UXGRl1GXkdIx0dWsQGlQx9Fu4HBXlNa4MekACGAAxoRaOQqLR2ExWPQQZCtjkRHsDoh9OpuPYVPJPoY9B5HvUPBh0WUVOpdD9NOodP9AXDcOEKFEYnEEklUpEMvSwAidkj8vtCoc0RjtNjuLjKQTPMSVA03DddDcaX4AX0UBBCGAxlNZosVhteUJ+SgCqBhejMeLJfjLLJ9JoMEZlPJ1J9ripHPpaX0AK7YFjYagAd2w42isR103myzWm2yfLypsF5tRlrFOJkeM0BL0GDU3ELxmuRgM8m9-yDEDgEgCiKTZqKCAAtPICa2lIWu92u1mfYFcMEiKRyPXkULrDICUY7hgHGT55pjg5Xe5+-1BsMxwKUfUTvYOmpWiprjczHb6ppFM0sx8vj9vhXeph6aPE+PUwh5NxHRoHPoAN0LRNAeC9LhkV4Wm0BwYLUTRtHXDUtW3ZNd3JRR1CuX51GOEwtAJE5FDcW8rivZ03iMdd-UDEMwwjSIUMbQ50OJLDvhwk40RzC8qTsQj-24S5qkcGRfF8IA */
+    /** @xstate-layout N4IgpgJg5mDOIC5RQJYBcB0KB26UEMAbFALxygGIIB7bMLbAN2oGt6d0BtABgF1FQAB2qw8tASAAeiAEwBGORm4A2GQFZu3AOwyALFp0BmGQBoQAT0S6AnIYzGZ17gA41c5zpkyAvt7OpMDjQCYjJsSjAAJ0jqSIxBQnw0ADNYgFsGLj4JYVFg8SQpWQUlVQ1tPQMZYzNLBGVuOzljZwVDXVanOV9-dAwwNME0cwoAZQBRABlxgGEAFQB9ACVxgAUAeR5+QtyxbAlpBDdFQydlN1bnQzUr2sQGxWUWxu5HazUtax6QAIwAY0ItHIVFo7CYrHoANBWxyIj2B0QWlcGGUyl0cjUjhuukMWjuCBxWgw1kcyi0pzkWie3C+fh+fShuHCFCiMTiCSSqUiGUZYBhOzh+X2hUOCm0KPUFWUchxNnxhnaGB0zQ+5N0r1Uum+v2IsGC4QAYihCHAQXQGMw2BhdWgjSbYPyhIKUAVQIdjvYzhd3NdbhZZO8lY0VYZtGprKplNq+jbyHbTazYvFEil0taUHr4w7sgK8i7hW7EB7TipvVcboZ8ecZBhmjJLl4qTIXNHAhATWMprNFisNo6QLshQiEFTFDpUdxdDZqh9nPj1HZ62jzs5rM0SS26b8UO2wGMAJoAORm-cH+eHHxraOcujJmKeN3nujUGGbhjkzbkNNs7TUrfiACuhDEMyNDmjglr0IIQGEKezqukUCDyIoKiShU+hGKY-oEs+GDOF4TjWO8WiYoYrj-tBwHAom7IplyGSUbBOZOnmCGHMhpRoToGHVFhdStBg5SaDSH5Ip8f5bn0AHYCw2DUAA7tg4zRLEnbTPMyxrJszEDvBBaIWKRJlFKMrtNY85ka+yj4e0zRyNY+gRr4dJyRAcASAEsKsfphwALTKPivkvkRIWhWFhj-kEISkOQXnwiKVh8UWKhKDY+jqHWwb-gMQx1Cx8WFgguK6PYejVNcnx6NKVavLWzyhm8Hy0r0mCMrFuYFYhtjOIJZTStYWg4u8SVIW4KLSre5zcB+Kiov+saGsa7kdUOCVFboNYtDKChIuqt74jiygYOqmrvmSDnOM4kW7nFq2FWSPVeNWRFIg5uLzmodhImiajhk2X5qFGkmYIx7X5XdiEbfOXivsGCqA1+DkyEDLUYNJskKUpKmRLd55rR+DnHdKiPokiZGVthCgvvegOkeSchohFzlAA */
     id: "git",
     tsTypes: {} as import("./index.typegen").Typegen0,
     schema: {} as { context: Context; events: Event },
     context: {
       repo: "",
-      files: [],
+      markdownFiles: {},
       error: null,
     },
     initial: "initializing",
@@ -50,20 +50,12 @@ function createGitMachine() {
               /^https:\/\/github.com\//,
               ""
             );
-
-            const files = await git.listFiles({
-              fs,
-              dir: ROOT_DIR,
-              ref: DEFAULT_BRANCH,
-            });
-
-            return { repo, files };
+            return { repo };
           },
           onDone: {
-            target: "idle",
+            target: "gettingFiles",
             actions: assign({
               repo: (_, event) => event.data.repo as string,
-              files: (_, event) => event.data.files as string[],
             }),
           },
           onError: "empty",
@@ -78,6 +70,8 @@ function createGitMachine() {
         invoke: {
           id: "clone",
           src: async (_, event) => {
+            if (!("repo" in event)) throw new Error("No repo selected");
+
             const repo = event.repo;
 
             // Wipe file system
@@ -103,22 +97,13 @@ function createGitMachine() {
               // onAuth: () => ({}),
             });
 
-            // List files
-            // TODO: Investigate git.walk() as a more performant alternative to git.listFiles()
-            const files = await git.listFiles({
-              fs,
-              dir: ROOT_DIR,
-              ref: DEFAULT_BRANCH,
-            });
-
-            return { repo, files };
+            return { repo };
           },
           onDone: {
-            target: "idle",
+            target: "gettingFiles",
             actions: [
               assign({
                 repo: (_, event) => event.data.repo as string,
-                files: (_, event) => event.data.files as string[],
               }),
             ],
           },
@@ -127,7 +112,53 @@ function createGitMachine() {
             actions: assign({
               error: (_, event) => event.data as Error,
               repo: "",
-              files: [],
+              markdownFiles: {},
+            }),
+          },
+        },
+      },
+      gettingFiles: {
+        invoke: {
+          id: "getFiles",
+          src: async () => {
+            const markdownFiles = await git.walk({
+              fs,
+              dir: ROOT_DIR,
+              trees: [WORKDIR()],
+              map: async (filepath, [entry]) => {
+                // Ignore .git directory
+                if (filepath.startsWith(".git")) return;
+
+                // Ignore non-markdown files
+                if (!filepath.endsWith(".md")) return;
+
+                // Get file content
+                const content = await entry?.content();
+
+                if (!content) return null;
+
+                return [
+                  filepath.replace(/\.md$/, ""),
+                  new TextDecoder().decode(content),
+                ];
+              },
+            });
+
+            return { markdownFiles: Object.fromEntries(markdownFiles) };
+          },
+          onDone: {
+            target: "idle",
+            actions: [
+              assign({
+                markdownFiles: (_, event) =>
+                  event.data.markdownFiles as Record<string, string>,
+              }),
+            ],
+          },
+          onError: {
+            target: "unknownError",
+            actions: assign({
+              error: (_, event) => event.data as Error,
             }),
           },
         },
@@ -135,6 +166,40 @@ function createGitMachine() {
       idle: {
         on: {
           SELECT_REPO: "cloning",
+          SYNC: "pulling",
+        },
+      },
+      pulling: {
+        invoke: {
+          id: "pull",
+          src: async () => {
+            // Pull from GitHub
+            console.log(`$ git pull`);
+            await git.pull({
+              fs,
+              http,
+              dir: ROOT_DIR,
+              corsProxy: "https://cors.isomorphic-git.org",
+              singleBranch: true,
+              author: {
+                // TODO: Don't hardcode these values
+                name: "Cole Bemis",
+                email: "colebemis@github.com",
+              },
+              onMessage: console.log,
+              // https://isomorphic-git.org/docs/en/onAuth
+              // onAuth: () => ({}),
+            });
+          },
+          onDone: {
+            target: "gettingFiles",
+          },
+          onError: {
+            target: "unknownError",
+            actions: assign({
+              error: (_, event) => event.data as Error,
+            }),
+          },
         },
       },
       unknownError: {
@@ -153,11 +218,15 @@ const gitMachineAtom = atomWithMachine(createGitMachine);
 
 type Note = {
   id: string;
+  content: string;
 };
 
 const notesAtom = atom<Note[]>((get) => {
   const state = get(gitMachineAtom);
-  return state.context.files.map((file) => ({ id: file }));
+  return Object.entries(state.context.markdownFiles).map(([id, content]) => ({
+    id,
+    content,
+  }));
 });
 
 export function App() {
@@ -188,8 +257,13 @@ export function App() {
         />
         <button type="submit">Select</button>
       </form>
+      {state.matches("idle") ? (
+        <button onClick={() => send({ type: "SYNC" })}>Sync</button>
+      ) : null}
       <pre>Repo: {state.context.repo}</pre>
-      <pre>Files: {JSON.stringify(state.context.files, null, 2)}</pre>
+      <pre>
+        Markdown files: {JSON.stringify(state.context.markdownFiles, null, 2)}
+      </pre>
       <pre>Notes: {JSON.stringify(notes, null, 2)}</pre>
     </div>
   );
