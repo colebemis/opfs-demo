@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@isomorphic-git/lightning-fs": "^4.6.0",
     "@xstate/react": "^4.0.0-beta.10",
     "isomorphic-git": "^1.25.0",
-    "memfs": "^4.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-lag-radar": "^1.0.0",

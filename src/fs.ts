@@ -1,8 +1,11 @@
-import { FsaNodeFs } from "memfs/lib/fsa-to-node";
-import { IFileSystemDirectoryHandle } from "memfs/lib/fsa/types";
+import LightningFS from "@isomorphic-git/lightning-fs";
 
-// Reference: https://github.com/streamich/memfs/blob/c8bfa38aa15f1d3c9f326e9c25c8972326193a26/demo/git-opfs/main.ts
-const rootDir =
-  navigator.storage.getDirectory() as unknown as Promise<IFileSystemDirectoryHandle>;
+const DB_NAME = "fs";
 
-export const fs = new FsaNodeFs(rootDir);
+// TODO: Investigate replacing lightning-fs with memfs + OPFS for better performance
+export const fs = new LightningFS(DB_NAME);
+
+/** Delete file system database */
+export function fsWipe() {
+  window.indexedDB.deleteDatabase(DB_NAME);
+}
