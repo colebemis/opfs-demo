@@ -3,17 +3,15 @@ import git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import LagRadar from "react-lag-radar";
 import { assign, createMachine, fromPromise } from "xstate";
-import { fs } from "./fs";
+import { fs, fsWipe } from "./fs";
 
-// TODO: Fix memfs Safari error: (await this.__getFileById(d,"writeFile")).createWritable is not a function.
-// TODO: Check if memfs git-opfs demo works in Safari
-// TODO: Configure synchronous fs adatper
 // TODO: Run file system and git commands in a web worker to avoid blocking the UI thread
 
-const ROOT_DIR = "/tmp";
+const ROOT_DIR = "/root";
 const DEFAULT_BRANCH = "main";
 
 type Context = {
+  repo: string;
   files: string[];
   error: Error | null;
 };
@@ -25,6 +23,7 @@ const gitMachine = createMachine({
   id: "git",
   types: {} as { context: Context; events: Event },
   context: {
+    repo: "",
     files: [],
     error: null,
   },
@@ -34,21 +33,33 @@ const gitMachine = createMachine({
       invoke: {
         id: "init",
         src: fromPromise(async () => {
+          const remoteOriginUrl = await git.getConfig({
+            fs,
+            dir: ROOT_DIR,
+            path: "remote.origin.url",
+          });
+
+          // Remove https://github.com/ from the beginning of the URL to get the repo name
+          const repo = String(remoteOriginUrl).replace(
+            /^https:\/\/github.com\//,
+            ""
+          );
+
           const files = await git.listFiles({
             fs,
             dir: ROOT_DIR,
             ref: DEFAULT_BRANCH,
           });
 
-          return { files };
+          return { repo, files };
         }),
         onDone: {
           target: "idle",
           actions: assign({
+            repo: ({ event }) => event.output.repo as string,
             files: ({ event }) => event.output.files as string[],
           }),
         },
-        // If git.listFiles() fails, the repo is empty
         onError: "empty",
       },
     },
@@ -60,18 +71,17 @@ const gitMachine = createMachine({
     cloning: {
       invoke: {
         id: "clone",
-        input: ({ event }) => {
-          return { repo: event.repo };
-        },
+        input: ({ event }) => ({ repo: event.repo }),
         src: fromPromise(async ({ input }) => {
-          // Remove existing repo
-          console.log(`$ rm -rf ${ROOT_DIR}`);
-          await fs.promises.rm(ROOT_DIR, { recursive: true, force: true });
+          const repo = input.repo;
+
+          // Wipe file system
+          // TODO: Only remove the repo directory instead of wiping the entire file system
+          // Blocked by https://github.com/isomorphic-git/lightning-fs/issues/71
+          fsWipe();
 
           // Clone repo
-          console.log(
-            `$ git clone https://github.com/${input.repo}.git ${ROOT_DIR}`
-          );
+          console.log(`$ git clone https://github.com/${repo}.git ${ROOT_DIR}`);
           await git.clone({
             fs,
             http,
@@ -94,18 +104,23 @@ const gitMachine = createMachine({
             ref: DEFAULT_BRANCH,
           });
 
-          return files;
+          return { repo, files };
         }),
         onDone: {
           target: "idle",
-          actions: assign({
-            files: ({ event }) => event.output as string[],
-          }),
+          actions: [
+            assign({
+              repo: ({ event }) => event.output.repo as string,
+              files: ({ event }) => event.output.files as string[],
+            }),
+          ],
         },
         onError: {
           target: "unknownError",
           actions: assign({
             error: ({ event }) => event.data as Error,
+            repo: "",
+            files: [],
           }),
         },
       },
@@ -153,6 +168,7 @@ export function App() {
         />
         <button type="submit">Select</button>
       </form>
+      <pre>Repo: {state.context.repo}</pre>
       <pre>Files: {JSON.stringify(state.context.files, null, 2)}</pre>
     </div>
   );
